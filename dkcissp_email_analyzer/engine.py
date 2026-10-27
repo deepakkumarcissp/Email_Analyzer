@@ -325,6 +325,7 @@ class EmailAnalyzer:
             "ai_analysis": ai,
             "summary": self._summary(verdict, threat_type, parsed, signals),
             "recommended_actions": self._actions(verdict, parsed, urls),
+            "checks_performed": self._checks_summary(parsed, auth, recon, signals, urls, ai),
             "analyzed_at": _now(),
         }
         return result
@@ -955,6 +956,156 @@ Classify the email. Respond ONLY with this exact JSON (no markdown):
             if k not in seen:
                 seen.add(k); out.append(i)
         return out
+
+    def _checks_summary(self, p: ParsedEmail, auth: dict, recon: dict,
+                        signals: List[Signal], urls: List[dict], ai: dict) -> List[dict]:
+        """Always-populated, plain-English breakdown of every category this
+        analyzer examines — shown regardless of verdict, so a 'benign' result
+        visibly reflects real checks that came back clean rather than looking
+        like nothing was done."""
+        by_id = {s.id: s for s in signals}
+
+        def flagged(ids):
+            return [by_id[i] for i in ids if i in by_id]
+
+        checks = []
+
+        # 1) Header authentication
+        if auth.get("available"):
+            parts = [f"SPF {auth.get('spf','unknown')}", f"DKIM {auth.get('dkim','unknown')}",
+                     f"DMARC {auth.get('dmarc','unknown')}"]
+            auth_flagged = flagged(["auth_spf_fail", "auth_dkim_fail", "auth_dmarc_fail", "auth_dmarc_none"])
+            checks.append({
+                "id": "header_auth", "label": "Header authentication (SPF / DKIM / DMARC)",
+                "status": "flagged" if auth_flagged else "clear",
+                "detail": ("; ".join(parts) + " — read directly from the message's "
+                          "Authentication-Results header." +
+                          ("" if not auth_flagged else " Issue(s): " + "; ".join(s.detail for s in auth_flagged))),
+            })
+        else:
+            no_auth_flagged = flagged(["no_spf", "no_dmarc", "no_mx"])
+            checks.append({
+                "id": "header_auth", "label": "Header authentication (SPF / DKIM / DMARC)",
+                "status": "not_available" if not no_auth_flagged else "flagged",
+                "detail": ("No original headers were supplied (forwarded snippet) — SPF/DKIM/DMARC "
+                          "could not be read directly, so sender-domain posture was checked live instead." +
+                          ("" if not no_auth_flagged else " Found: " + "; ".join(s.detail for s in no_auth_flagged))),
+            })
+
+        # 2) Sender identity
+        id_flagged = flagged(["display_name_spoof", "reply_to_mismatch", "return_path_mismatch",
+                              "freemail_sender", "lookalike_domain"])
+        checks.append({
+            "id": "sender_identity",
+            "label": "Sender identity (display name, Reply-To, Return-Path, free-webmail, look-alike domain)",
+            "status": "flagged" if id_flagged else "clear",
+            "detail": ("; ".join(s.detail for s in id_flagged) if id_flagged else
+                      "Display name, Reply-To, and Return-Path were compared against the From address"
+                      + (f", and the sender domain ({p.from_domain}) was checked for look-alike similarity "
+                         f"to {', '.join(self.org_domains)}" if self.org_domains else "")
+                      + " — no spoofing indicators found."),
+        })
+
+        # 3) Brand impersonation
+        brand_flagged = [s for s in signals if s.id.startswith("brand_impersonation")]
+        brand_list = ", ".join(sorted(_BRAND_DISPLAY.values()))
+        checks.append({
+            "id": "brand_impersonation", "label": "Brand impersonation",
+            "status": "flagged" if brand_flagged else "clear",
+            "detail": ("; ".join(s.detail for s in brand_flagged) if brand_flagged else
+                      f"Message content was checked against {len(_BRANDS)} commonly-impersonated "
+                      f"brands ({brand_list}) — no impersonation detected."),
+        })
+
+        # 4) URL / link analysis
+        url_flagged = flagged(["redirect_wrapper", "url_shortener", "url_anchor_mismatch"]) + \
+                      [s for s in signals if s.id == "transactional_via_bulk"]
+        if not urls:
+            url_detail = "No links were found in this message."
+            url_status = "not_available"
+        elif url_flagged:
+            url_detail = "; ".join(s.detail for s in url_flagged)
+            url_status = "flagged"
+        else:
+            url_detail = (f"{len(urls)} link(s) found — extracted from HTML and plaintext, defanged, "
+                          "checked for redirect wrappers/shorteners, and anchor-text-vs-target mismatch — "
+                          "no deceptive links found.")
+            url_status = "clear"
+        checks.append({"id": "url_analysis", "label": f"URL / link analysis ({len(urls)} found)",
+                       "status": url_status, "detail": url_detail})
+
+        # 5) Lure language / social-engineering content
+        lure_flagged = flagged(["financial_lure", "credential_lure", "urgency", "bank_change_request"])
+        checks.append({
+            "id": "lure_language", "label": "Lure language (financial, credential-harvest, urgency, payment-redirect)",
+            "status": "flagged" if lure_flagged else "clear",
+            "detail": ("; ".join(s.detail for s in lure_flagged) if lure_flagged else
+                      "Message text was scanned for financial/wire-transfer, credential-harvest, urgency, "
+                      "and payment-redirect language — none found."),
+        })
+
+        # 6) Combination / BEC pattern
+        combo_flagged = flagged(["bec_pattern"])
+        checks.append({
+            "id": "bec_pattern", "label": "Business Email Compromise (BEC) pattern",
+            "status": "flagged" if combo_flagged else "clear",
+            "detail": ("; ".join(s.detail for s in combo_flagged) if combo_flagged else
+                      "Checked whether a financial-action request co-occurs with a freemail/mismatched "
+                      "sender and little or no legitimate link content — no BEC pattern detected."),
+        })
+
+        # 7) Attachments
+        att_flagged = flagged(["dangerous_attachment"])
+        if not p.attachments:
+            att_detail, att_status = "No attachments were present in this message.", "not_available"
+        elif att_flagged:
+            att_detail, att_status = "; ".join(s.detail for s in att_flagged), "flagged"
+        else:
+            att_detail = f"{len(p.attachments)} attachment(s) checked against known high-risk file types — none flagged."
+            att_status = "clear"
+        checks.append({"id": "attachments", "label": f"Attachments ({len(p.attachments)} found)",
+                       "status": att_status, "detail": att_detail})
+
+        # 8) Sender-domain live recon (DNS / WHOIS)
+        if recon and recon.get("domain"):
+            bits = []
+            bits.append("MX record present" if recon.get("mx") else "no MX record")
+            bits.append("SPF record present" if recon.get("spf") else "no SPF record")
+            bits.append("DMARC record present" if recon.get("dmarc") else "no DMARC record")
+            if recon.get("age_days") is not None:
+                bits.append(f"registered ~{recon['age_days']} days ago")
+            checks.append({"id": "domain_recon", "label": f"Live sender-domain recon ({recon['domain']})",
+                           "status": "info", "detail": "; ".join(bits) + "."})
+        else:
+            checks.append({"id": "domain_recon", "label": "Live sender-domain recon",
+                           "status": "not_available", "detail": "No sender domain could be determined to look up."})
+
+        # 9) Reputation (VirusTotal) — optional
+        vt_flagged = flagged(["vt_reputation"])
+        vt_key = self.cfg.get("virustotal_api_key") or os.environ.get("EMAIL_ANALYZER_VT_API_KEY", "")
+        if not vt_key:
+            checks.append({"id": "reputation", "label": "Threat-intel reputation (VirusTotal)",
+                           "status": "skipped",
+                           "detail": "Not enabled — no VirusTotal API key configured (set EMAIL_ANALYZER_VT_API_KEY to turn this on)."})
+        elif vt_flagged:
+            checks.append({"id": "reputation", "label": "Threat-intel reputation (VirusTotal)",
+                           "status": "flagged", "detail": "; ".join(s.detail for s in vt_flagged)})
+        else:
+            checks.append({"id": "reputation", "label": "Threat-intel reputation (VirusTotal)",
+                           "status": "clear",
+                           "detail": "Sender domain and link host(s) checked against VirusTotal — no vendors flagged them."})
+
+        # 10) Optional LLM classification pass
+        if not isinstance(ai, dict) or not ai.get("ai_triage"):
+            checks.append({"id": "llm_pass", "label": "AI classification pass",
+                           "status": "skipped",
+                           "detail": "Not enabled — no OPENAI_API_KEY configured. This verdict is based entirely on the deterministic checks above."})
+        else:
+            checks.append({"id": "llm_pass", "label": "AI classification pass",
+                           "status": "info",
+                           "detail": ai.get("reasoning") or f"AI verdict: {ai.get('verdict', 'n/a')} (confidence {ai.get('confidence', 'n/a')})."})
+
+        return checks
 
     def _summary(self, verdict: str, threat_type: str, p: ParsedEmail,
                  signals: List[Signal]) -> str:

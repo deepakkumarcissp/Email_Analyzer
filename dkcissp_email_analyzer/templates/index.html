@@ -17,10 +17,20 @@
   }
   header {
     background: var(--panel); border-bottom: 1px solid var(--border);
-    padding: 18px 24px; display: flex; align-items: baseline; gap: 10px;
+    padding: 14px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }
-  header h1 { font-size: 18px; margin: 0; }
-  header span { color: var(--muted); font-size: 13px; }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 2px; background: #142238; color: #fff;
+    display: grid; place-items: center; font-family: Arial, sans-serif; font-weight: 900;
+    font-size: 12px; letter-spacing: 0.24px; flex: none;
+  }
+  .brand-words { font-family: Arial, sans-serif; font-weight: 900; font-size: 16px; letter-spacing: 0.16px; }
+  .brand-words .dk { color: #152238; }
+  .brand-words .cissp { color: #c62834; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .tagline { color: var(--muted); font-size: 13px; }
+  header .divider { color: var(--border); }
   main {
     max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px;
     display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
@@ -65,16 +75,37 @@
   .sig-info { border-color: var(--info); }
   .signal .title { font-weight: 600; font-size: 13px; }
   .signal .detail { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .check { border-left: 3px solid var(--border); padding: 8px 10px; margin-bottom: 6px; background: #fafbfc; border-radius: 0 6px 6px 0; }
+  .check .title { font-weight: 600; font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+  .check .detail { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+  .check-clear { border-color: #2e7d32; }
+  .check-flagged { border-color: var(--critical); }
+  .check-info { border-color: var(--low); }
+  .check-skipped, .check-not_available { border-color: var(--border); opacity: .8; }
+  .chk-icon { font-size: 12px; }
+  details.checks-wrap { margin-top: 4px; }
+  details.checks-wrap > summary { cursor: pointer; font-size: 12.5px; color: var(--accent); font-weight: 600; list-style: none; }
+  details.checks-wrap > summary::-webkit-details-marker { display: none; }
+  details.checks-wrap > summary::before { content: "▸ "; }
+  details.checks-wrap[open] > summary::before { content: "▾ "; }
   ul.actions { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
   code.url { display: block; font-size: 12px; background: #f1f2f5; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; word-break: break-all; }
-  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; display: flex;
+           flex-direction: column; align-items: center; gap: 6px; }
+  footer .brand { transform: scale(0.85); }
   a { color: var(--accent); }
 </style>
 </head>
 <body>
 <header>
-  <h1>DKCISSP Email Analyzer</h1>
-  <span>— paste a suspicious email, get an instant phishing / BEC verdict, fully local</span>
+  <a class="brand" href="https://dkcissp.com" target="_blank" rel="noopener" aria-label="DKCISSP home">
+    <span class="brand-mark">DK</span>
+    <span class="brand-words"><span class="dk">DK</span><span class="cissp">CISSP</span></span>
+  </a>
+  <span class="divider">|</span>
+  <h1>Email Analyzer</h1>
+  <span class="divider">—</span>
+  <span class="tagline">paste a suspicious email, get an instant phishing / BEC verdict, fully local</span>
 </header>
 <main>
   <div class="panel">
@@ -99,8 +130,15 @@
   </div>
 </main>
 <footer>
-  DKCISSP Email Analyzer — open-source, defensive, runs entirely on your own machine.
-  <a href="https://github.com/deepakkumarcissp/Email_Analyzer" target="_blank" rel="noopener">Source on GitHub</a>
+  <a class="brand" href="https://dkcissp.com" target="_blank" rel="noopener" aria-label="DKCISSP home">
+    <span class="brand-mark">DK</span>
+    <span class="brand-words"><span class="dk">DK</span><span class="cissp">CISSP</span></span>
+  </a>
+  <div>
+    Email Analyzer — open-source, defensive, runs entirely on your own machine.
+    <a href="https://github.com/deepakkumarcissp/Email_Analyzer" target="_blank" rel="noopener">Source on GitHub</a>
+    · <a href="https://dkcissp.com" target="_blank" rel="noopener">dkcissp.com</a>
+  </div>
 </footer>
 <script>
 const btn = document.getElementById('analyze-btn');
@@ -122,6 +160,21 @@ function render(result) {
     <div><strong>Headers available:</strong> ${result.headers_available ? 'yes' : 'no'}</div>
   </div>`;
   html += `<div class="summary">${esc(result.summary)}</div>`;
+
+  if (result.checks_performed && result.checks_performed.length) {
+    const icons = { clear: '✅', flagged: '⚠️', info: 'ℹ️', skipped: '⏭️', not_available: '⚪' };
+    const flaggedCount = result.checks_performed.filter(c => c.status === 'flagged').length;
+    html += `<details class="checks-wrap" ${flaggedCount || result.verdict !== 'benign' ? 'open' : ''}>
+      <summary>What we checked (${result.checks_performed.length} categories, ${flaggedCount} flagged)</summary>`;
+    for (const c of result.checks_performed) {
+      const icon = icons[c.status] || '•';
+      html += `<div class="check check-${esc(c.status)}">
+        <div class="title"><span class="chk-icon">${icon}</span>${esc(c.label)}</div>
+        <div class="detail">${esc(c.detail)}</div>
+      </div>`;
+    }
+    html += `</details>`;
+  }
 
   if (result.signals && result.signals.length) {
     html += `<div class="section-title">Signals (${result.signals.length})</div>`;
