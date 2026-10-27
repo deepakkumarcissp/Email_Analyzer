@@ -40,7 +40,21 @@ Two things are **optional and off by default**:
 URL analysis is done by parsing the text — nothing is requested from the attacker's
 infrastructure.
 
-## Install
+## Quick start — one click
+
+1. [Download the repo](https://github.com/deepakkumarcissp/Email_Analyzer/archive/refs/heads/main.zip) and unzip it (or `git clone` it).
+2. Double-click the launcher for your OS:
+   - **Windows:** `run.bat`
+   - **macOS:** `run.command`
+   - **Linux:** `run.sh`
+3. Your browser opens automatically at `http://127.0.0.1:5000` — paste an email and click **Analyze Email**.
+
+That's it — no manual `pip install`, no virtual environment setup. The first run takes about a
+minute to quietly set itself up; every run after that starts instantly. The only prerequisite is
+**Python 3.9+** installed on your machine (the launcher tells you if it's missing, with a link to
+get it). Nothing you paste into the tool ever leaves your computer.
+
+## Install manually (for developers / the CLI / scripting)
 
 ```bash
 pip install -e .
@@ -78,6 +92,8 @@ The CLI exits `0` for a benign verdict and `1` for anything else, so it's usable
 and pre-commit-style hooks.
 
 ## Use it — local web UI
+
+If you used the one-click launcher above, this is already running. To start it manually instead:
 
 ```bash
 pip install -e ".[web]"
