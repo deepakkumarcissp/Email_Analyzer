@@ -40,19 +40,31 @@ Two things are **optional and off by default**:
 URL analysis is done by parsing the text — nothing is requested from the attacker's
 infrastructure.
 
-## Quick start — one click
+## Quick start — one command
 
-1. [Download the repo](https://github.com/deepakkumarcissp/Email_Analyzer/archive/refs/heads/main.zip) and unzip it (or `git clone` it).
-2. Double-click the launcher for your OS:
-   - **Windows:** `run.bat`
-   - **macOS:** `run.command`
-   - **Linux:** `run.sh`
-3. Your browser opens automatically at `http://127.0.0.1:1008` — paste an email and click **Analyze Email**.
+**macOS / Linux** — paste this into a terminal:
 
-That's it — no manual `pip install`, no virtual environment setup. The first run takes about a
-minute to quietly set itself up; every run after that starts instantly. The only prerequisite is
-**Python 3.9+** installed on your machine (the launcher tells you if it's missing, with a link to
-get it). Nothing you paste into the tool ever leaves your computer.
+```bash
+curl -fsSL https://raw.githubusercontent.com/deepakkumarcissp/Email_Analyzer/main/install.sh | bash
+```
+
+**Windows** — paste this into PowerShell:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/deepakkumarcissp/Email_Analyzer/main/install.ps1 | iex
+```
+
+That single command downloads the project, sets up a private virtual environment, installs
+everything it needs, starts the local web UI, and opens it in your browser at
+`http://127.0.0.1:1008` — no manual `pip install`, no Git knowledge required. The only
+prerequisite is **Python 3.9+** on your machine (the installer tells you if it's missing, with a
+link to get it). Run the same command again any time to update and relaunch.
+
+Prefer not to pipe a script into your shell? Download the repo instead and double-click the
+launcher for your OS — `run.sh` (Linux), `run.command` (macOS), or `run.bat` (Windows). Same
+result, just started by hand from a local copy.
+
+Nothing you paste into the tool ever leaves your computer.
 
 ## Install manually (for developers / the CLI / scripting)
 
