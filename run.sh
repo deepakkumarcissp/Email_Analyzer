@@ -27,7 +27,7 @@ if [ ! -d ".venv" ]; then
   ./.venv/bin/pip install -q -e ".[web]"
 fi
 
-export PORT="${PORT:-5000}"
+export PORT="${PORT:-1008}"
 URL="http://127.0.0.1:${PORT}"
 
 (

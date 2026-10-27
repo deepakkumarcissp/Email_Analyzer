@@ -26,7 +26,7 @@ if not exist ".venv\Scripts\python.exe" (
   .venv\Scripts\python.exe -m pip install -q -e ".[web]"
 )
 
-if "%PORT%"=="" set PORT=5000
+if "%PORT%"=="" set PORT=1008
 start "" http://127.0.0.1:%PORT%
 
 echo.

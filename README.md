@@ -47,7 +47,7 @@ infrastructure.
    - **Windows:** `run.bat`
    - **macOS:** `run.command`
    - **Linux:** `run.sh`
-3. Your browser opens automatically at `http://127.0.0.1:5000` — paste an email and click **Analyze Email**.
+3. Your browser opens automatically at `http://127.0.0.1:1008` — paste an email and click **Analyze Email**.
 
 That's it — no manual `pip install`, no virtual environment setup. The first run takes about a
 minute to quietly set itself up; every run after that starts instantly. The only prerequisite is
@@ -100,7 +100,7 @@ pip install -e ".[web]"
 dkcissp-email-analyzer-web
 ```
 
-Then open **http://127.0.0.1:5000**, paste the email, and click **Analyze Email**.
+Then open **http://127.0.0.1:1008**, paste the email, and click **Analyze Email**.
 
 ## Use it — as a library
 

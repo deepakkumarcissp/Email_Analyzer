@@ -5,7 +5,7 @@ Run with:
 or:
     python -m dkcissp_email_analyzer.webapp
 
-Then open http://127.0.0.1:5000 and paste a suspicious email. Everything
+Then open http://127.0.0.1:1008 and paste a suspicious email. Everything
 runs locally — nothing is sent anywhere except the optional passive
 VirusTotal / LLM lookups you explicitly configure via environment variables.
 """
@@ -44,7 +44,7 @@ def api_analyze():
 
 
 def main():
-    port = int(os.environ.get("PORT", "5000"))
+    port = int(os.environ.get("PORT", "1008"))
     host = os.environ.get("HOST", "127.0.0.1")
     debug = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
     app.run(host=host, port=port, debug=debug)
