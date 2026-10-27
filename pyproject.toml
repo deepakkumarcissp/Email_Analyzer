@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dkcissp-email-analyzer"
+version = "1.0.0"
+description = "Open-source phishing / spear-phishing / BEC email triage — analyze a suspicious email in seconds, entirely locally."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Deepak Kumar (DKCISSP)" }]
+requires-python = ">=3.9"
+keywords = ["phishing", "security", "email", "bec", "triage", "infosec", "blue-team"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Information Technology",
+  "Topic :: Security",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+  "dnspython>=2.3",
+  "requests>=2.28",
+]
+
+[project.optional-dependencies]
+web = ["flask>=2.3"]
+llm = ["openai>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/deepakkumarcissp/Email_Analyzer"
+Issues = "https://github.com/deepakkumarcissp/Email_Analyzer/issues"
+
+[project.scripts]
+dkcissp-email-analyzer = "dkcissp_email_analyzer.cli:main"
+dkcissp-email-analyzer-web = "dkcissp_email_analyzer.webapp:main"
+
+[tool.setuptools.packages.find]
+include = ["dkcissp_email_analyzer*"]
+
+[tool.setuptools.package-data]
+dkcissp_email_analyzer = ["templates/*.html"]

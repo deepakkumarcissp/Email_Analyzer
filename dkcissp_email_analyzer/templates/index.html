@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DKCISSP Email Analyzer</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --border: #dde1e6; --text: #1b2330;
+    --muted: #5b6472; --accent: #2554e8; --accent-dark: #1a3fb5;
+    --critical: #c62828; --high: #e8650f; --medium: #c9a227; --low: #2a6fd6; --info: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 18px 24px; display: flex; align-items: baseline; gap: 10px;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; }
+  main {
+    max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; }
+  textarea {
+    width: 100%; min-height: 280px; resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.5px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: #fbfbfc;
+  }
+  label { font-size: 12.5px; color: var(--muted); display: block; margin: 12px 0 4px; }
+  input[type=text] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;
+  }
+  button {
+    margin-top: 14px; background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; cursor: pointer; font-weight: 600;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { opacity: .6; cursor: default; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  #result-placeholder { color: var(--muted); font-size: 13px; }
+  .verdict-badge {
+    display: inline-block; padding: 4px 12px; border-radius: 999px; color: #fff; font-weight: 700;
+    font-size: 13px; text-transform: uppercase; letter-spacing: .03em;
+  }
+  .v-phishing, .v-bec, .v-spear_phishing { background: var(--critical); }
+  .v-suspicious { background: var(--high); }
+  .v-spam { background: var(--medium); }
+  .v-benign { background: #2e7d32; }
+  .stat-row { display: flex; gap: 18px; margin: 12px 0; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .summary { font-size: 13.5px; line-height: 1.55; margin: 10px 0 16px; }
+  .section-title { font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
+  .signal { border-left: 3px solid var(--info); padding: 8px 10px; margin-bottom: 8px; background: #fafbfc; border-radius: 0 6px 6px 0; }
+  .sig-critical { border-color: var(--critical); }
+  .sig-high { border-color: var(--high); }
+  .sig-medium { border-color: var(--medium); }
+  .sig-low { border-color: var(--low); }
+  .sig-info { border-color: var(--info); }
+  .signal .title { font-weight: 600; font-size: 13px; }
+  .signal .detail { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  ul.actions { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+  code.url { display: block; font-size: 12px; background: #f1f2f5; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; word-break: break-all; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>DKCISSP Email Analyzer</h1>
+  <span>— paste a suspicious email, get an instant phishing / BEC verdict, fully local</span>
+</header>
+<main>
+  <div class="panel">
+    <h2>Analyze an email</h2>
+    <label for="content">Raw email or pasted snippet</label>
+    <textarea id="content" placeholder="Paste the full 'Show original' text, an .eml file's contents, or just the forwarded email body…"></textarea>
+    <label for="org-domains">Your own domain(s), comma-separated (optional, for look-alike detection)</label>
+    <input type="text" id="org-domains" placeholder="example.com, example.org">
+    <button id="analyze-btn">Analyze Email</button>
+    <div class="hint">
+      Best results: the <strong>original message</strong> (Gmail → ⋮ → <em>Show original</em>, or an .eml file)
+      so SPF/DKIM/DMARC can be read. A plain <strong>forwarded snippet</strong> also works — header
+      authentication is then inferred from live domain checks. The suspicious link is
+      <strong>never opened</strong>; reputation is only checked passively, and only if you've configured an API key.
+      Nothing you paste here leaves your machine except optional, explicitly-configured lookups.
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Result</h2>
+    <div id="result-placeholder">Verdict, indicators, extracted URLs and IOCs will appear here.</div>
+    <div id="result" style="display:none;"></div>
+  </div>
+</main>
+<footer>
+  DKCISSP Email Analyzer — open-source, defensive, runs entirely on your own machine.
+  <a href="https://github.com/deepakkumarcissp/Email_Analyzer" target="_blank" rel="noopener">Source on GitHub</a>
+</footer>
+<script>
+const btn = document.getElementById('analyze-btn');
+const resultEl = document.getElementById('result');
+const placeholderEl = document.getElementById('result-placeholder');
+
+function esc(s) {
+  return (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function render(result) {
+  const v = result.verdict || 'unknown';
+  let html = '';
+  html += `<span class="verdict-badge v-${esc(v)}">${esc(v.replace('_',' '))}</span>`;
+  html += `<div class="stat-row">
+    <div><strong>Risk:</strong> ${esc(result.risk)}</div>
+    <div><strong>Confidence:</strong> ${esc(result.confidence)}</div>
+    <div><strong>Score:</strong> ${esc(result.score)}</div>
+    <div><strong>Headers available:</strong> ${result.headers_available ? 'yes' : 'no'}</div>
+  </div>`;
+  html += `<div class="summary">${esc(result.summary)}</div>`;
+
+  if (result.signals && result.signals.length) {
+    html += `<div class="section-title">Signals (${result.signals.length})</div>`;
+    for (const s of result.signals) {
+      html += `<div class="signal sig-${esc(s.severity)}">
+        <div class="title">[${esc(s.severity.toUpperCase())}] ${esc(s.title)}</div>
+        <div class="detail">${esc(s.detail)}</div>
+      </div>`;
+    }
+  }
+
+  if (result.urls && result.urls.length) {
+    html += `<div class="section-title">URLs found (${result.urls.length})</div>`;
+    for (const u of result.urls) {
+      html += `<code class="url">${esc(u.defanged)}${u.wrapper ? ' — ' + esc(u.wrapper) : ''}</code>`;
+    }
+  }
+
+  if (result.recommended_actions && result.recommended_actions.length) {
+    html += `<div class="section-title">Recommended actions</div><ul class="actions">`;
+    for (const a of result.recommended_actions) html += `<li>${esc(a)}</li>`;
+    html += `</ul>`;
+  }
+
+  resultEl.innerHTML = html;
+  resultEl.style.display = 'block';
+  placeholderEl.style.display = 'none';
+}
+
+btn.addEventListener('click', async () => {
+  const content = document.getElementById('content').value;
+  const orgDomains = document.getElementById('org-domains').value;
+  if (!content.trim()) {
+    alert('Paste an email first.');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Analyzing…';
+  try {
+    const resp = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, org_domains: orgDomains }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      alert(data.error || 'Analysis failed.');
+      return;
+    }
+    render(data);
+  } catch (e) {
+    alert('Request failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze Email';
+  }
+});
+</script>
+</body>
+</html>
